@@ -1,0 +1,93 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Number Match – Zincir Level Testi</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#3d3a8c;color:#fff;font-family:Nunito,system-ui,sans-serif;display:flex;justify-content:center;min-height:100vh}
+.app{width:100%;max-width:440px;padding:14px 12px 24px;display:flex;flex-direction:column;gap:10px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pill{background:#2c2a6e;border-radius:999px;padding:7px 14px;font-weight:900}
+select{background:#2c2a6e;color:#fff;border:0;border-radius:999px;padding:8px 12px;font:inherit;font-weight:900}
+.mode{display:flex;background:#2c2a6e;border-radius:999px;padding:3px}
+.mode button{border:0;background:none;color:#aab;font:inherit;font-weight:900;padding:7px 12px;border-radius:999px;cursor:pointer}
+.mode button.on{background:#ff8a3d;color:#fff}
+.info{text-align:center;font-size:13px;color:#c9c6f5;min-height:36px}
+.cleared{display:flex;justify-content:center;gap:9px;font-weight:900;font-size:15px}
+.cleared span{opacity:.35}.cleared span.done{opacity:1;color:#9be87a}
+.board{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;background:transparent}
+.cell{aspect-ratio:1;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:clamp(18px,6vw,28px);cursor:pointer;user-select:none;transition:transform .15s,background .15s,opacity .3s}
+.cell.n{background:#2f2c76;box-shadow:inset 0 -3px 0 #24215e}
+.cell.dead{background:#232150;color:#3a377a;cursor:default}
+.cell.void{visibility:hidden}
+.cell.hl{background:#4a4697}.cell.hlc{background:#3d4f8a}
+.cell.sel{background:#fff!important;transform:scale(1.08)}
+.cell.hint{animation:pulse .7s infinite alternate}
+.cell.pop{animation:pop .35s forwards}
+@keyframes pulse{to{background:#7a6cf0}}
+@keyframes pop{0%{transform:scale(1.25)}100%{transform:scale(.9)}}
+.d1{color:#ff8fd0}.d2{color:#9be87a}.d3{color:#ff6b6b}.d4{color:#6fd3ea}.d5{color:#ffa94d}.d6{color:#7ad0e6}.d7{color:#ff7272}.d8{color:#a8e86b}.d9{color:#f39ad8}
+.bar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.bar button{border:0;background:#2c2a6e;color:#fff;font:inherit;font-weight:900;padding:10px 14px;border-radius:14px;cursor:pointer}
+.bar button.pri{background:#ff8a3d}
+.rules{font-size:12.5px;color:#c9c6f5;background:#34318a;border-radius:12px;padding:10px 12px;line-height:1.45}
+.rules b{color:#fff}
+.toast{text-align:center;font-weight:900;font-size:18px;min-height:26px;color:#9be87a}
+</style></head><body><div class="app">
+<div class="top"><select id="lv"></select><span class="pill" id="diff"></span>
+<div class="mode"><button id="m2" class="on">2'li</button><button id="mc">Zincirli</button></div></div>
+<div class="cleared" id="cl"></div>
+<div class="board" id="b"></div>
+<div class="toast" id="toast"></div>
+<div class="info" id="info"></div>
+<div class="bar"><button id="undo">↶ Geri</button><button id="rst">Baştan</button><button id="hint">💡 İpucu</button><button id="sol" class="pri">Çözümü oynat</button></div>
+<div class="rules"><b>Kurallar:</b> Aynı iki sayı ya da toplamı 10 olan iki sayı eşleşir. Eşleşme yatay, dikey veya çapraz olabilir; arada canlı sayı olmamalı (silinmiş hücreler ve şekil boşlukları engel değil). Okuma sırasında art arda gelen iki sayı da eşleşir (satır sonundan alt satırın başına).<br><b>Zincirli modda</b> ayrıca toplamı 10 olan 3 sayı silinebilir: 1.→2. ve 2.→3. sayı birbirini görmeli. Zincir tek sayıda hücre sildiği için tahtayı bitirmek için zincirleri <b>çift sayıda</b> kullanman gerekir.<br>Bir sayıya dokununca aynı sayılar ve 10'a tamamlayanları yanar.</div>
+</div><script>
+const C=9;
+function mk(level){const cells=[];level.grid.forEach((row,r)=>row.forEach((v,c)=>{if(v!==null)cells.push(r*C+c)}));const order=cells.slice().sort((a,b)=>a-b);const idx={};order.forEach((p,i)=>idx[p]=i);const val={};level.grid.forEach((row,r)=>row.forEach((v,c)=>{if(v!==null)val[r*C+c]=v}));return{order,idx,val}}
+function connected(a,b,alive,G){const ra=Math.floor(a/C),ca=a%C,rb=Math.floor(b/C),cb=b%C,dr=rb-ra,dc=cb-ca;
+ if(dr===0||dc===0||Math.abs(dr)===Math.abs(dc)){const n=Math.max(Math.abs(dr),Math.abs(dc)),sr=Math.sign(dr),sc=Math.sign(dc);let ok=true;for(let k=1;k<n;k++)if(alive.has((ra+sr*k)*C+ca+sc*k)){ok=false;break}if(ok)return true}
+ let i=G.idx[a],j=G.idx[b];if(i>j)[i,j]=[j,i];for(let k=i+1;k<j;k++)if(alive.has(G.order[k]))return false;return true}
+function validMove(m,alive,G){if(!m.every(p=>alive.has(p))||new Set(m).size!==m.length)return false;const v=m.map(p=>G.val[p]);
+ if(m.length===2)return(v[0]===v[1]||v[0]+v[1]===10)&&connected(m[0],m[1],alive,G);
+ if(m.length===3)return v[0]+v[1]+v[2]===10&&connected(m[0],m[1],alive,G)&&connected(m[1],m[2],alive,G);return false}
+function hasAnyMove(alive,G,chain){const L=[...alive];for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){if(validMove([L[i],L[j]],alive,G))return true}
+ if(chain)for(const m of L)for(const a of L)for(const c of L)if(a!==m&&c!==m&&a!==c&&validMove([a,m,c],alive,G))return true;return false}
+if(typeof module!=='undefined')module.exports={mk,validMove,hasAnyMove};
+
+const LEVELS=[{"name":"Artı","grid":[[null,null,null,3,5,2,null,null,null],[null,null,null,7,5,3,null,null,null],[7,2,8,4,3,8,1,7,9],[9,4,8,8,4,1,6,4,3],[null,null,null,3,6,1,null,null,null],[null,null,null,6,6,9,null,null,null]],"sol2":[[3,12],[4,13],[14,18],[5,19],[20,29],[21,31],[24,32],[25,35],[26,27],[28,48],[23,30],[33,34],[22,39],[40,49],[41,50]],"solChain":[[4,3,19],[12,22],[14,18],[20,29],[21,31],[24,32],[25,35],[26,27],[28,48],[23,30],[33,34],[40,49],[41,50],[5,13,39]],"diff":"Kolay"},{"name":"Kum Saati","grid":[[5,3,8,3,9,1,9,2,8],[null,7,6,4,3,1,7,7,null],[null,null,9,6,8,3,3,null,null],[null,null,6,1,9,1,3,null,null],[null,7,4,8,6,3,2,1,null],[5,1,2,7,9,1,8,1,9]],"sol2":[[0,45],[1,10],[3,13],[4,5],[6,14],[2,7],[11,12],[15,16],[20,30],[21,29],[8,22],[23,24],[31,32],[33,37],[39,47],[38,40],[42,51],[43,46],[41,48],[49,50],[52,53]],"solChain":[[12,3,13],[0,45],[1,10],[2,22],[4,5],[6,14],[7,8],[11,21],[15,16],[20,30],[23,24],[29,38],[31,32],[33,37],[39,47],[41,40,50],[46,43,51],[48,42,52],[49,53]],"diff":"Orta"},{"name":"Kalp","grid":[[null,9,6,null,null,null,6,6,null],[5,1,5,1,null,2,5,5,2],[5,3,7,7,9,3,1,3,2],[null,9,4,8,6,4,4,3,null],[null,null,6,5,1,8,2,null,null],[null,null,null,9,9,1,null,null,null]],"sol2":[[1,10],[2,6],[9,11],[12,22],[14,30],[15,16],[17,26],[19,20],[21,23],[7,31],[25,34],[24,28],[29,32],[33,38],[18,39],[40,48],[41,42],[49,50]],"solChain":[[2,10,19],[1,28],[6,7],[9,11],[12,22],[14,30],[15,16],[17,26],[20,21],[25,34],[29,31],[32,33],[24,40],[41,42],[48,49],[38,23,50],[18,39]],"diff":"Orta"},{"name":"Kale","grid":[[8,null,4,null,2,null,4,null,6],[4,6,6,4,4,2,2,9,4],[7,4,7,9,1,8,3,9,7],[2,2,null,null,null,null,null,3,1],[9,6,null,null,null,null,null,5,4],[3,1,9,3,3,2,5,8,2]],"sol2":[[2,10],[0,4],[6,8],[9,11],[12,13],[14,15],[16,25],[21,22],[23,50],[20,24],[26,34],[27,28],[18,48],[17,19],[35,36],[43,51],[37,44],[46,47],[45,49],[52,53]],"solChain":[[4,2,12],[6,8],[9,10],[11,13],[0,14],[15,23],[16,25],[21,22],[20,24],[26,34],[27,28],[18,48],[17,19],[52,53],[43,35,44],[45,37,46],[36,47],[49,50,51]],"diff":"Orta"},{"name":"Ok","grid":[[null,null,null,3,1,null,null,null,null],[null,null,6,9,9,5,null,null,null],[null,4,9,5,6,7,9,null,null],[1,9,8,6,3,6,3,7,null],[null,null,2,6,7,null,null,null,null],[null,null,6,5,4,null,null,null,null],[null,null,1,5,1,1,null,null,null]],"sol2":[[4,12],[11,19],[20,28],[14,21],[22,30],[23,31],[13,24],[3,33],[29,38],[39,47],[34,40],[48,57],[32,49],[27,56],[58,59]],"solChain":[[4,3,11],[12,13],[20,28],[22,30],[23,31],[24,27],[29,38],[19,39],[14,21],[34,40],[48,57],[47,49],[56,58],[33,32,59]],"diff":"Orta"},{"name":"Kare","grid":[[1,3,1,9,8,2,1,9,5],[6,7,4,8,2,9,9,6,7],[6,5,5,4,2,9,5,3,1],[4,3,7,6,4,5,5,2,9]],"sol2":[[1,10],[0,2],[4,5],[3,6],[7,15],[9,11],[12,13],[14,23],[17,25],[16,18],[8,24],[19,20],[21,30],[26,35],[28,29],[27,31],[32,33],[22,34]],"solChain":[[1,0,9],[2,3],[4,5],[6,7],[11,21],[12,13],[14,23],[18,27],[19,20],[24,33],[28,29],[30,31],[25,16,26],[8,32],[15,35],[10,17],[22,34]],"diff":"Zor"},{"name":"Merdiven","grid":[[5,9,9,null,null,null,null,null,null],[3,5,6,1,2,null,null,null,null],[5,5,9,1,2,2,6,null,null],[3,1,1,7,3,7,1,6,9],[null,null,1,8,3,2,8,7,8],[null,null,null,null,7,4,5,5,2]],"sol2":[[0,10],[1,2],[12,20],[13,22],[18,19],[9,27],[21,29],[24,34],[28,38],[30,31],[23,39],[32,40],[33,35],[41,42],[44,53],[43,49],[11,50],[51,52]],"solChain":[[9,18,13],[0,10],[1,2],[12,20],[21,29],[22,23],[24,34],[28,38],[27,30],[32,40],[33,35],[44,53],[43,49],[51,52],[19,31,41],[39,42],[11,50]],"diff":"Zor"},{"name":"Elmas","grid":[[null,null,null,4,7,1,null,null,null],[null,null,2,2,1,9,1,null,null],[null,6,5,7,8,7,3,3,null],[2,5,3,3,4,1,6,6,5],[null,5,3,6,9,4,7,6,null],[null,null,4,9,3,4,3,null,null],[null,null,null,6,1,4,null,null,null],[null,null,null,null,3,null,null,null,null]],"sol2":[[5,13],[11,12],[3,19],[14,15],[4,24],[20,28],[21,29],[23,25],[22,27],[30,38],[31,39],[32,40],[33,34],[35,37],[41,50],[42,51],[43,47],[48,58],[49,67],[57,59]],"solChain":[[5,4,12],[13,14],[20,28],[21,29],[19,39],[11,27],[23,24],[3,33],[25,30],[31,41],[34,43],[35,37],[40,48],[38,42],[50,59],[57,67,58],[47,49,51],[15,22,32]],"diff":"Zor"},{"name":"Ev ✨","grid":[[null,null,null,5,8,2,null,null,null],[null,null,7,3,2,8,8,null,null],[null,3,5,6,7,8,1,6,null],[5,7,4,8,3,2,1,5,5],[7,6,5,null,null,null,9,4,9],[7,4,8,null,null,null,8,9,1]],"sol2":[[4,5],[11,12],[13,14],[15,23],[19,28],[3,20],[21,29],[22,31],[24,33],[30,32],[27,34],[25,43],[36,45],[37,46],[35,38],[42,44],[47,51],[52,53]],"solChain":[[12,3,13],[4,5],[11,19],[14,15],[28,36],[33,42],[34,35],[25,43],[44,52],[47,51],[24,27,29],[21,37],[23,30],[31,32,38],[22,45],[20,46,53]],"diff":"Kolay"},{"name":"Kelebek ✨","grid":[[3,9,null,null,null,null,null,9,8],[9,3,9,null,null,null,6,1,9],[4,1,2,8,null,8,5,1,7],[7,3,8,4,null,6,4,6,7],[6,2,2,6,null,4,9,9,5],[1,4,8,null,null,null,1,1,9]],"sol2":[[0,10],[1,7],[9,11],[16,17],[15,18],[20,21],[26,27],[29,37],[30,32],[33,34],[24,44],[25,43],[28,35],[36,46],[23,38],[39,41],[42,51],[19,45],[8,47],[52,53]],"solChain":[[0,10,18],[1,7],[9,11],[16,17],[20,21],[26,27],[29,37],[30,32],[33,34],[24,44],[25,43],[36,46],[39,41],[38,35,51],[45,47,52],[42,53],[15,19,28],[8,23]],"diff":"Kolay"},{"name":"Taç ✨","grid":[[3,null,null,null,null,null,null,null,6],[7,6,null,4,9,1,null,1,4],[4,6,4,7,6,3,8,8,9],[1,4,5,2,9,1,2,2,8],[null,4,8,5,9,5,5,8,null]],"sol2":[[0,9],[8,10],[12,22],[13,14],[16,26],[17,18],[19,20],[21,23],[24,25],[28,37],[29,39],[30,38],[27,31],[32,40],[33,34],[35,43],[41,42]],"solChain":[[0,8,16],[10,12],[13,14],[17,18],[19,20],[9,21],[24,25],[26,27],[28,37],[29,39],[30,38],[31,40],[33,34],[35,43],[41,42],[22,32,23]],"diff":"Kolay"},{"name":"Yıldız ✨","grid":[[null,null,null,8,8,7,null,null,null],[1,4,2,3,3,5,5,9,8],[null,8,3,8,9,5,1,8,null],[null,null,7,2,8,5,2,null,null],[null,3,4,6,null,2,9,3,null],[2,6,null,null,null,null,null,1,7]],"sol2":[[3,4],[5,13],[11,19],[12,20],[14,15],[16,24],[17,21],[23,32],[22,42],[25,33],[29,37],[10,46],[30,31],[38,39],[43,53],[41,45],[9,52]],"solChain":[[5,9,45],[3,4],[11,19],[12,13],[14,15],[16,24],[17,25],[20,29],[21,30],[23,32],[22,42],[31,41],[38,39],[37,43],[10,46],[52,33,53]],"diff":"Zor"}];
+let li=0,chain=false,G,alive,sel=[],hist=[],playing=null;
+const $=id=>document.getElementById(id);
+LEVELS.forEach((l,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(i+1)+'. '+l.name;$('lv').appendChild(o)});
+function start(){clearInterval(playing);playing=null;const l=LEVELS[li];G=mk(l);alive=new Set(Object.keys(G.val).map(Number));sel=[];hist=[];$('diff').textContent=l.diff;$('toast').textContent='';render();status()}
+function render(hints){const l=LEVELS[li],b=$('b');b.innerHTML='';const rows=l.grid.length;
+ for(let r=0;r<rows;r++)for(let c=0;c<C;c++){const p=r*C+c,v=l.grid[r][c],d=document.createElement('div');d.className='cell';
+  if(v===null)d.classList.add('void');else{d.textContent=v;
+   if(alive.has(p)){d.classList.add('n','d'+v);
+    if(sel.length){const s=G.val[sel[sel.length-1]];if(v===s)d.classList.add('hl');else if(v+s===10)d.classList.add('hlc')}
+    if(sel.includes(p))d.classList.add('sel');if(hints&&hints.includes(p))d.classList.add('hint');d.onclick=()=>tap(p)}else d.classList.add('dead')}
+  b.appendChild(d)}
+ const left=new Set([...alive].map(p=>G.val[p]));$('cl').innerHTML=[1,2,3,4,5,6,7,8,9].map(n=>`<span class="${left.has(n)?'':'done'}">${n}</span>`).join('')}
+function status(){if(!alive.size){$('toast').textContent='🎉 Level temizlendi!';$('info').textContent='';return}
+ $('info').textContent=hasAnyMove(alive,G,chain)?(sel.length===2?'Zincir: toplamı 10 yapacak 3. sayıyı seç':''):'Hamle kalmadı – Geri al ya da Baştan başla (+ olmadan tasarlandı)'}
+function apply(m){hist.push([...alive]);m.forEach(p=>alive.delete(p));sel=[];render();status()}
+function tap(p){if(playing)return;
+ if(sel.includes(p)){sel=sel.filter(x=>x!==p);render();status();return}
+ const t=[...sel,p];
+ if(t.length===2&&validMove(t,alive,G)){apply(t);return}
+ if(chain&&t.length===2){const v=G.val[t[0]]+G.val[t[1]];if(v<10&&connectedPair(t)){sel=t;render();status();return}}
+ if(chain&&t.length===3&&validMove(t,alive,G)){apply(t);return}
+ sel=[p];render();status()}
+function connectedPair(t){return validMove([t[0],t[1]],new Set([...alive]),{...G,val:{...G.val,[t[0]]:0,[t[1]]:10}})}
+function findMove(){const sol=LEVELS[li][chain?'solChain':'sol2'];
+ // önce kayıtlı çözüm yolundaysak sıradaki hamle
+ const L=[...alive];for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++)if(validMove([L[i],L[j]],alive,G))return[L[i],L[j]];return null}
+$('undo').onclick=()=>{if(playing||!hist.length)return;alive=new Set(hist.pop());sel=[];$('toast').textContent='';render();status()};
+$('rst').onclick=start;
+$('hint').onclick=()=>{if(playing)return;const m=findMove();if(m)render(m)};
+$('sol').onclick=()=>{start();const sol=LEVELS[li][chain?'solChain':'sol2'];let k=0;$('info').textContent=chain?'Zincirli çözüm oynatılıyor…':'2\'li çözüm oynatılıyor…';
+ playing=setInterval(()=>{if(k>=sol.length){clearInterval(playing);playing=null;status();return}const m=sol[k++];render(m);setTimeout(()=>{hist.push([...alive]);m.forEach(p=>alive.delete(p));render();if(k>=sol.length)status()},380)},800)};
+$('lv').onchange=e=>{li=+e.target.value;start()};
+$('m2').onclick=()=>{chain=false;$('m2').classList.add('on');$('mc').classList.remove('on');start()};
+$('mc').onclick=()=>{chain=true;$('mc').classList.add('on');$('m2').classList.remove('on');start()};
+start();
+</script></body></html>
